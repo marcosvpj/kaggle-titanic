@@ -61,7 +61,6 @@ data = get_data_from_file('raw_data.csv')
 
 process_csv_file('test.csv', create_gender_based_model)
 
-
 fare_bracket_size = 10
 fare_ceiling = 40
 
