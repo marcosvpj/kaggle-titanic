@@ -31,40 +31,15 @@ def get_data_from_file(filename):
     return np.array(d)
 
 
-data = get_data_from_file('raw_data.csv')
-
-
 def is_female(row_data):
     return row_data[3] == 'female'
 
 
-# number_passengers = np.size(data[0::, PASSENGER_ID].astype(np.float))
-# number_survivors = np.sum(data[0::, PASSENGER_ID].astype(np.float))
-#
-# print('Number of passengers {}'.format(number_passengers))
-# print('Number of survivors {}'.format(number_survivors))
-# print('Proportion survivors {}'.format(number_survivors / number_passengers))
-#
-# women_only_stats = data[0::, SEX_COLUMN] == 'female'
-# men_only_stats = data[0::, SEX_COLUMN] != 'female'
-#
-# women_aboard = np.size(data[women_only_stats, 1].astype(np.float))
-# women_survivors = np.sum(data[women_only_stats, 1].astype(np.float))
-# survivors_female = women_survivors / women_aboard
-# print('Number of women aboard {}'.format(women_aboard))
-# print('Proportion of women survivors {}'.format(survivors_female))
-#
-# men_aboard = np.size(data[men_only_stats, 1].astype(np.float))
-# men_survivors = np.sum(data[men_only_stats, 1].astype(np.float))
-# survivors_male = men_survivors / men_aboard
-# print('Number of men aboard {}'.format(men_aboard))
-# print('Proportion of men survivors {}'.format(survivors_male))
-
 def write_in_file(filename, data_to_write):
-    file = open(filename, 'w')
-    file_object = csv.writer(file)
+    file = open(filename, 'w', newline='')
+    file_object = csv.DictWriter(file, fieldnames=["PassengerId", "Survived"])
+    file_object.writeheader()
 
-    # do(file_object, data_to_write)
     for d in data_to_write:
         file_object.writerow(d)
 
@@ -72,56 +47,72 @@ def write_in_file(filename, data_to_write):
 
 
 def create_gender_based_model(file_object):
-    # def gender_based_model(file_to_write, data_to_write):
     data_model = []
     for row in file_object:
-        if row[3] == 'female':
-            data_model.append([row[0], '1'])
+        if is_female(row):
+            data_model.append({'PassengerId': row[0], 'Survived': '1'})
         else:
-            data_model.append([row[0], '0'])
+            data_model.append({'PassengerId': row[0], 'Survived': '0'})
 
     write_in_file('gender_based_model.csv', data_model)
 
 
+data = get_data_from_file('raw_data.csv')
+
 process_csv_file('test.csv', create_gender_based_model)
 
-fare_ceiling = 40
-
-data[data[0::, 9].astype(np.float) >= fare_ceiling, 9] = fare_ceiling - 1
 
 fare_bracket_size = 10
-number_of_price_brackets = int(fare_ceiling / fare_bracket_size)
-
-number_of_classes = len(np.unique(data[0::, 2]))
-
-survivor_table = np.zeros((2, number_of_classes, number_of_price_brackets))
-
-for i in range(number_of_classes):
-    for j in range(number_of_price_brackets):
-        women_only = data[
-            (data[0::, SEX_COLUMN] == "female") & (data[0::, 2].astype(np.float) == i + 1) & (
-                data[0:, 9].astype(np.float) >= j * fare_bracket_size) & (
-                data[0:, 9].astype(np.float) < (j + 1) * fare_bracket_size), 1
-        ]
-
-        men_only = data[
-            (data[0::, SEX_COLUMN] != "female") & (data[0::, 2].astype(np.float) == i + 1) & (
-                data[0:, 9].astype(np.float) >= j * fare_bracket_size) & (
-                data[0:, 9].astype(np.float) < (j + 1) * fare_bracket_size), 1
-        ]
-        survivor_table[0, i, j] = np.mean(women_only.astype(np.float))
-        survivor_table[1, i, j] = np.mean(men_only.astype(np.float))
-
-        survivor_table[survivor_table != survivor_table] = 0
-
-        survivor_table[survivor_table < 0.5] = 0
-        survivor_table[survivor_table >= 0.5] = 1
+fare_ceiling = 40
 
 
-def process_test_file(file_object):
+def generate_number_of_price_brackets():
+
+    data[data[0::, 9].astype(np.float) >= fare_ceiling, 9] = fare_ceiling - 1
+
+    return int(fare_ceiling / fare_bracket_size)
+
+
+def generate_survival_table():
+    number_of_price_brackets = generate_number_of_price_brackets()
+
+    number_of_classes = len(np.unique(data[0::, 2]))
+
+    survivor_table = np.zeros((2, number_of_classes, number_of_price_brackets))
+
+    for i in range(number_of_classes):
+        for j in range(number_of_price_brackets):
+            women_only = data[
+                (data[0::, SEX_COLUMN] == "female") & (data[0::, 2].astype(np.float) == i + 1) & (
+                    data[0:, 9].astype(np.float) >= j * fare_bracket_size) & (
+                    data[0:, 9].astype(np.float) < (j + 1) * fare_bracket_size), 1
+            ]
+
+            men_only = data[
+                (data[0::, SEX_COLUMN] != "female") & (data[0::, 2].astype(np.float) == i + 1) & (
+                    data[0:, 9].astype(np.float) >= j * fare_bracket_size) & (
+                    data[0:, 9].astype(np.float) < (j + 1) * fare_bracket_size), 1
+            ]
+
+            # print(np.mean(women_only.astype(np.float)))
+            survivor_table[0, i, j] = np.mean(women_only.astype(np.float))
+            # print(np.mean(men_only.astype(np.float)))
+            survivor_table[1, i, j] = np.mean(men_only.astype(np.float))
+            # print(survivor_table)
+
+            survivor_table[survivor_table != survivor_table] = 0.
+            survivor_table[survivor_table < 0.5] = 0
+            survivor_table[survivor_table >= 0.5] = 1
+
+    return survivor_table
+
+
+def create_gender_class_model(file_object):
+    number_of_price_brackets = generate_number_of_price_brackets()
+    survivor_table = generate_survival_table()
+
     gender_class_model = []
     for row in file_object:
-        print(row)
         for price_bracket in range(number_of_price_brackets):
             try:
                 row[8] = float(row[8])
@@ -136,12 +127,14 @@ def process_test_file(file_object):
                 bin_fare = price_bracket
                 break
 
-        if is_female(row):  # If the passenger is female
-            gender_class_model.append([row[0], int(survivor_table[0, int(row[1]) - 1, bin_fare])])
-        else:  # else if male
-            gender_class_model.append([row[0], int(survivor_table[1, int(row[1]) - 1, bin_fare])])
+        row_data = {'PassengerId': row[0], 'Survived': 0}
+        if is_female(row):
+            row_data['Survived'] = int(survivor_table[0, int(row[1]) - 1, bin_fare])
+        else:
+            row_data['Survived'] = int(survivor_table[1, int(row[1]) - 1, int(bin_fare)])
+        gender_class_model.append(row_data)
 
     write_in_file("gender_class_model.csv", gender_class_model)
 
 
-process_csv_file('test.csv', process_test_file)
+process_csv_file('test.csv', create_gender_class_model)
